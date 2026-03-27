@@ -5,6 +5,11 @@
     <string name="download">Download</string>
     <string name="cancel">Cancel</string>
     <string name="no_downloads">No downloads yet</string>
+    <string name="select_to_download">Select to Download</string>
+    <string name="audios">Audios</string>
+    <string name="videos">Videos</string>
+    <string name="audio_only">Audio Only</string>
+    <string name="quality_demo">Quality Demo</string>
     <string name="notification_channel_name">Downloads</string>
     <string name="notification_channel_desc">Shows active downloads</string>
 </resources>
