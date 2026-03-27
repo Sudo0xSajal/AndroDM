@@ -39,8 +39,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
 
@@ -55,7 +55,7 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
     // Compose
-    implementation("androidx.compose.runtime:runtime:1.5.12")
+    implementation("androidx.compose.runtime:runtime:1.7.0")
 
     // Room
     implementation("androidx.room:room-runtime:2.6.1")
