@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Legacy references kept for compatibility -->
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>
@@ -7,4 +8,25 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- App colour palette -->
+    <color name="primary">#1565C0</color>
+    <color name="primary_dark">#003c8f</color>
+    <color name="primary_light">#5E92F3</color>
+    <color name="accent">#00BCD4</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="background">#F0F4F8</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_surface">#212121</color>
+    <color name="on_surface_secondary">#757575</color>
+    <color name="divider">#E0E0E0</color>
+
+    <color name="status_queued">#9E9E9E</color>
+    <color name="status_downloading">#1E88E5</color>
+    <color name="status_completed">#43A047</color>
+    <color name="status_failed">#E53935</color>
+    <color name="status_cancelled">#FB8C00</color>
+    <color name="status_paused">#8E24AA</color>
+
+    <color name="progress_track">#BBDEFB</color>
 </resources>

@@ -33,7 +33,10 @@ class DownloadListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        adapter = DownloadAdapter { download -> viewModel.deleteDownload(download) }
+        adapter = DownloadAdapter(
+            onCancel = { download -> viewModel.cancelDownload(download.id) },
+            onDelete = { download -> viewModel.deleteDownload(download) }
+        )
         binding.rvDownloads.layoutManager = LinearLayoutManager(requireContext())
         binding.rvDownloads.adapter = adapter
 
@@ -41,6 +44,7 @@ class DownloadListFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.downloads.collect { downloads ->
                     adapter.submitList(downloads)
+                    binding.tvEmpty.visibility = if (downloads.isEmpty()) View.VISIBLE else View.GONE
                 }
             }
         }
