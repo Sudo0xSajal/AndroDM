@@ -1,3 +1,5 @@
+package com.vmate.downloader.domain.models
+
 data class VideoInfo(
     val id: String,
     val url: String,
