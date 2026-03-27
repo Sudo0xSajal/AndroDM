@@ -7,4 +7,8 @@
     <string name="no_downloads">No downloads yet</string>
     <string name="notification_channel_name">Downloads</string>
     <string name="notification_channel_desc">Shows active downloads</string>
+    <string name="select_to_download">Select to Download</string>
+    <string name="audios">Audios</string>
+    <string name="videos">Videos</string>
+    <string name="audio_only">Audio Only</string>
 </resources>
