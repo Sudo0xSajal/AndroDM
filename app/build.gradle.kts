@@ -54,6 +54,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.4")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
+    // Compose
+    implementation("androidx.compose.runtime:runtime:1.5.12")
+
     // Room
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
