@@ -1,1 +1,10 @@
-<your_content_here>
+<resources>
+    <string name="app_name">AndroDM</string>
+    <string name="add_download">Add Download</string>
+    <string name="url_hint">Enter URL</string>
+    <string name="download">Download</string>
+    <string name="cancel">Cancel</string>
+    <string name="no_downloads">No downloads yet</string>
+    <string name="notification_channel_name">Downloads</string>
+    <string name="notification_channel_desc">Shows active downloads</string>
+</resources>
