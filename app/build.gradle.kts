@@ -19,7 +19,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "../proguard-rules.pro"
+                rootProject.file("proguard-rules.pro")
             )
         }
     }
