@@ -17,13 +17,16 @@ class DownloadManager(private val context: Context) {
     private val activeJobs = mutableMapOf<Long, Job>()
 
     fun startDownload(download: Download) {
-        val job = scope.launch {
-            val id = dao.insertDownload(download.copy(status = DownloadStatus.DOWNLOADING))
+        scope.launch {
+            val id = dao.insertDownload(download.copy(status = DownloadStatus.QUEUED))
+            activeJobs[id] = coroutineContext[Job]!!
             try {
                 val request = Request.Builder().url(download.url).build()
                 val response = HttpClientFactory.client.newCall(request).execute()
                 val body = response.body ?: throw Exception("Empty response body")
                 val totalBytes = body.contentLength()
+
+                dao.updateDownload(download.copy(id = id, status = DownloadStatus.DOWNLOADING))
 
                 val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                 dir.mkdirs()
@@ -64,7 +67,6 @@ class DownloadManager(private val context: Context) {
                 activeJobs.remove(id)
             }
         }
-        activeJobs[download.id] = job
     }
 
     fun cancelDownload(id: Long) {
