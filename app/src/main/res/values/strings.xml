@@ -1,1 +1,7 @@
-<your_content_here>
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AndroDM</string>
+    <string name="add_download">Add download</string>
+    <string name="download_list">Download list</string>
+    <string name="download_item">Download item</string>
+</resources>
