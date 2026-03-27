@@ -1,7 +1,6 @@
 package com.vmate.downloader.core.download
 
 import android.content.Context
-import android.os.Environment
 import com.vmate.downloader.core.network.HttpClientFactory
 import com.vmate.downloader.data.local.DownloadDatabase
 import com.vmate.downloader.domain.models.Download
@@ -28,7 +27,8 @@ class DownloadManager(private val context: Context) {
 
                 dao.updateDownload(download.copy(id = id, status = DownloadStatus.DOWNLOADING))
 
-                val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val dir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+                    ?: context.filesDir
                 dir.mkdirs()
                 val file = File(dir, download.filename)
 

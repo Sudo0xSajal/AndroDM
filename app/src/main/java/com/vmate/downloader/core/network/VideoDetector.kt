@@ -1,5 +1,6 @@
 package com.vmate.downloader.core.network
 
+import androidx.annotation.WorkerThread
 import com.vmate.downloader.domain.models.Video
 import okhttp3.Request
 
@@ -9,6 +10,7 @@ object VideoDetector {
         "video/x-msvideo", "video/mpeg", "video/3gpp"
     )
 
+    @WorkerThread
     fun detectVideo(url: String): Video? {
         return try {
             val request = Request.Builder().url(url).head().build()
