@@ -40,25 +40,26 @@ class PlaylistFragment : BottomSheetDialogFragment() {
         binding.tvPlaylistCount.text =
             getString(R.string.playlist_video_count, info.playlistCount)
 
-        val videos = if (info.formats.isEmpty()) {
-            List(info.playlistCount) { index ->
-                VideoInfo(
-                    id = "${index + 1}",
-                    url = info.url,
-                    title = getString(R.string.playlist_video_n, index + 1),
-                    thumbnailUrl = null,
-                    description = null,
-                    channel = info.channel,
-                    uploaderUrl = null,
-                    durationSeconds = null,
-                    viewCount = null,
-                    likeCount = null,
-                    uploadDate = null
-                )
-            }
-        } else emptyList()
+        // Build placeholder VideoInfo entries for the playlist items.
+        // Actual per-video metadata (titles, durations) requires yt-dlp; here we create
+        // numbered placeholders so users can select a range before starting the download.
+        val playlistVideos = List(info.playlistCount) { index ->
+            VideoInfo(
+                id = "${index + 1}",
+                url = info.url,
+                title = getString(R.string.playlist_video_n, index + 1),
+                thumbnailUrl = null,
+                description = null,
+                channel = info.channel,
+                uploaderUrl = null,
+                durationSeconds = null,
+                viewCount = null,
+                likeCount = null,
+                uploadDate = null
+            )
+        }
 
-        adapter = PlaylistVideoAdapter(videos) { selectedIndices ->
+        adapter = PlaylistVideoAdapter(playlistVideos) { selectedIndices ->
             binding.tvSelectedCount.text =
                 getString(R.string.playlist_selected_count, selectedIndices.size)
             binding.btnConfirm.isEnabled = selectedIndices.isNotEmpty()
@@ -76,7 +77,7 @@ class PlaylistFragment : BottomSheetDialogFragment() {
             val startText = binding.etRangeStart.text?.toString()?.trim()
             val endText = binding.etRangeEnd.text?.toString()?.trim()
             val start = startText?.toIntOrNull()?.minus(1) ?: 0
-            val end = endText?.toIntOrNull()?.minus(1) ?: (videos.size - 1)
+            val end = endText?.toIntOrNull()?.minus(1) ?: (playlistVideos.size - 1)
             adapter?.selectRange(start, end)
         }
 
@@ -86,7 +87,7 @@ class PlaylistFragment : BottomSheetDialogFragment() {
             dismiss()
         }
 
-        setupRangeInputWatchers(videos.size)
+        setupRangeInputWatchers(playlistVideos.size)
     }
 
     private fun setupRangeInputWatchers(total: Int) {

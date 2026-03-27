@@ -38,13 +38,14 @@ object VideoInfoService {
         val thumbnailUrl = if (videoId.isNotEmpty())
             "https://img.youtube.com/vi/$videoId/hqdefault.jpg" else null
 
+        val isPlaylist = isYouTubePlaylist(url)
         val formats = buildDefaultVideoFormats(url)
         val audioFormats = buildDefaultAudioFormats(url)
 
         return VideoInfo(
             id = videoId,
             url = url,
-            title = "YouTube Video",
+            title = if (isPlaylist) "YouTube Playlist" else "YouTube Video",
             thumbnailUrl = thumbnailUrl,
             description = null,
             channel = null,
@@ -54,9 +55,11 @@ object VideoInfoService {
             likeCount = null,
             uploadDate = null,
             formats = formats + audioFormats,
-            isPlaylist = isYouTubePlaylist(url),
-            playlistTitle = null,
-            playlistCount = 0
+            isPlaylist = isPlaylist,
+            playlistTitle = if (isPlaylist) "YouTube Playlist" else null,
+            // playlistCount cannot be determined without authenticated API/yt-dlp;
+            // set to a non-zero sentinel so the UI can show the playlist selection dialog.
+            playlistCount = if (isPlaylist) UNKNOWN_PLAYLIST_COUNT else 0
         )
     }
 
@@ -127,6 +130,11 @@ object VideoInfoService {
 
     private fun isYouTubePlaylist(url: String): Boolean =
         url.contains("list=") || url.contains("/playlist")
+
+    companion object {
+        /** Sentinel value used when a playlist's total video count cannot be determined. */
+        const val UNKNOWN_PLAYLIST_COUNT = 50
+    }
 
     private fun buildDefaultVideoFormats(url: String): List<FormatInfo> {
         val qualities = listOf(

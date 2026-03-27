@@ -59,27 +59,19 @@ class PlaylistVideoAdapter(
             binding.tvDuration.text = video.durationLabel()
             binding.checkbox.isChecked = isSelected
 
-            binding.root.setOnClickListener {
-                val adapterPos = bindingAdapterPosition
-                if (adapterPos in selectedIndices) {
-                    selectedIndices.remove(adapterPos)
-                } else {
-                    selectedIndices.add(adapterPos)
-                }
-                notifyItemChanged(adapterPos)
-                onSelectionChanged(selectedIndices.toSet())
-            }
+            binding.root.setOnClickListener { toggleSelection(bindingAdapterPosition) }
+            binding.checkbox.setOnClickListener { toggleSelection(bindingAdapterPosition) }
+        }
 
-            binding.checkbox.setOnClickListener {
-                val adapterPos = bindingAdapterPosition
-                if (adapterPos in selectedIndices) {
-                    selectedIndices.remove(adapterPos)
-                } else {
-                    selectedIndices.add(adapterPos)
-                }
-                notifyItemChanged(adapterPos)
-                onSelectionChanged(selectedIndices.toSet())
+        private fun toggleSelection(adapterPos: Int) {
+            if (adapterPos == RecyclerView.NO_POSITION) return
+            if (adapterPos in selectedIndices) {
+                selectedIndices.remove(adapterPos)
+            } else {
+                selectedIndices.add(adapterPos)
             }
+            notifyItemChanged(adapterPos)
+            onSelectionChanged(selectedIndices.toSet())
         }
     }
 }
