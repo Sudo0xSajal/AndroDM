@@ -7,9 +7,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.vmate.downloader.R
 import com.vmate.downloader.databinding.BottomSheetAddDownloadBinding
-import com.vmate.downloader.domain.models.Download
-import com.vmate.downloader.service.DownloadForegroundService
+import com.vmate.downloader.presentation.VideoDetailActivity
 
 class AddDownloadBottomSheet : BottomSheetDialogFragment() {
 
@@ -30,17 +30,17 @@ class AddDownloadBottomSheet : BottomSheetDialogFragment() {
         binding.btnDownload.setOnClickListener {
             val url = binding.etUrl.text?.toString()?.trim() ?: ""
             if (url.isBlank()) {
-                Toast.makeText(requireContext(), "Please enter a URL", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    requireContext(),
+                    getString(R.string.error_enter_url),
+                    Toast.LENGTH_SHORT
+                ).show()
                 return@setOnClickListener
             }
-            val filename = url.substringAfterLast("/").substringBefore("?")
-                .ifBlank { "download_${System.currentTimeMillis()}" }
-            val download = Download(url = url, filename = filename)
-            val intent = Intent(requireContext(), DownloadForegroundService::class.java).apply {
-                action = DownloadForegroundService.ACTION_START
-                putExtra(DownloadForegroundService.EXTRA_DOWNLOAD, download)
+            val intent = Intent(requireContext(), VideoDetailActivity::class.java).apply {
+                putExtra(VideoDetailActivity.EXTRA_URL, url)
             }
-            requireContext().startService(intent)
+            startActivity(intent)
             dismiss()
         }
     }

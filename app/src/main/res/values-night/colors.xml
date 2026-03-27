@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="bottom_sheet_handle">#555555</color>
+    <color name="selected_format_bg">#2A6200EE</color>
+    <color name="selected_format_text">#FFBB86FC</color>
+    <color name="unselected_format_bg">#FF1E1E1E</color>
 </resources>
