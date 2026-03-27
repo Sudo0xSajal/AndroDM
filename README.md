@@ -1,10 +1,32 @@
-# VMate-lite Downloader App
+# AndroDM
 
-## Overview
-VMate-lite is a lightweight downloader for content from VMate. This application allows users to easily download videos and other media from the platform.
+AndroDM is an Android project scaffold in active development.
 
-## Setup Instructions
-1. Clone the repository: `git clone <repository-url>`
-2. Open the project in Android Studio.
-3. Sync the project with Gradle files.
-4. Run the app on an emulator or a physical device.
+## Project Status
+
+This repository currently contains foundational Gradle and Android project files.
+Some module/resource files are placeholders and will be completed in future updates.
+
+## Requirements
+
+- JDK 17 or newer
+- Android Studio (latest stable recommended)
+
+## Build
+
+Use the Gradle wrapper from the repository root:
+
+```bash
+./gradlew build
+```
+
+## Open in Android Studio
+
+1. Open Android Studio.
+2. Select **Open** and choose this repository folder.
+3. Let Gradle sync complete.
+
+## Notes
+
+- Root project name: `AndroDM`
+- Build uses the committed Gradle wrapper files
