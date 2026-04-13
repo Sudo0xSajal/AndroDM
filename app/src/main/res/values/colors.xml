@@ -9,6 +9,7 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="bottom_sheet_handle">#CCCCCC</color>
+    <color name="drag_handle">#FFCCCCCC</color>
 
     <!-- App colour palette -->
     <color name="primary">#1565C0</color>
@@ -33,4 +34,6 @@
     <color name="selected_format_bg">#1A6200EE</color>
     <color name="selected_format_text">#FF6200EE</color>
     <color name="unselected_format_bg">#FFFFFFFF</color>
+    <color name="quality_selected_stroke">#FF6200EE</color>
+    <color name="quality_unselected_stroke">#00000000</color>
 </resources>

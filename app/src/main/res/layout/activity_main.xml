@@ -39,4 +39,13 @@
         app:tint="@color/on_primary"
         app:srcCompat="@android:drawable/ic_input_add" />
 
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_quality"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="16dp"
+        android:contentDescription="@string/quality_demo"
+        app:srcCompat="@drawable/ic_download" />
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

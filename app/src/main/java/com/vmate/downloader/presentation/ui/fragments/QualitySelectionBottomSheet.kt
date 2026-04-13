@@ -4,96 +4,128 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import com.vmate.downloader.databinding.BottomSheetQualityBinding
-import com.vmate.downloader.domain.models.QualityOption
+import com.vmate.downloader.R
+import com.vmate.downloader.databinding.BottomSheetQualitySelectionBinding
+import com.vmate.downloader.domain.models.VideoQuality
 import com.vmate.downloader.presentation.ui.adapter.QualityAdapter
 
+/**
+ * A reusable [BottomSheetDialogFragment] that lets the user choose a download quality.
+ *
+ * Example usage:
+ * ```kotlin
+ * val audioQuality = VideoQuality("Audio Only", "6.8 MB", "https://example.com/audio.mp3")
+ * val videoQualities = listOf(
+ *     VideoQuality("1080p (Full HD)", "120 MB", "https://example.com/1080p.mp4"),
+ *     VideoQuality("720p",            "80 MB",  "https://example.com/720p.mp4"),
+ *     VideoQuality("480p",            "45 MB",  "https://example.com/480p.mp4"),
+ *     VideoQuality("360p",            "25 MB",  "https://example.com/360p.mp4"),
+ * )
+ * QualitySelectionBottomSheet.newInstance(audioQuality, videoQualities) { selected ->
+ *     // Handle the selected VideoQuality here
+ *     startDownload(selected)
+ * }.show(supportFragmentManager, QualitySelectionBottomSheet.TAG)
+ * ```
+ */
 class QualitySelectionBottomSheet : BottomSheetDialogFragment() {
 
-    private var _binding: BottomSheetQualityBinding? = null
+    private var _binding: BottomSheetQualitySelectionBinding? = null
     private val binding get() = _binding!!
 
-    private var audioOptions: List<QualityOption> = emptyList()
-    private var videoOptions: List<QualityOption> = emptyList()
-    private var onDownloadSelected: ((QualityOption) -> Unit)? = null
+    private var audioQuality: VideoQuality? = null
+    private var videoQualities: List<VideoQuality> = emptyList()
+    private var onDownloadClicked: ((VideoQuality) -> Unit)? = null
 
-    private var selectedAudioOption: QualityOption? = null
-    private var selectedVideoOption: QualityOption? = null
-    private var lastSelectedSource: SelectionSource = SelectionSource.NONE
+    private lateinit var qualityAdapter: QualityAdapter
 
-    private enum class SelectionSource { NONE, AUDIO, VIDEO }
+    /** True when the "Audio Only" card is the currently selected option. */
+    private var isAudioSelected = false
+
+    fun setQualities(audio: VideoQuality?, videos: List<VideoQuality>) {
+        audioQuality = audio
+        videoQualities = videos
+    }
+
+    fun setOnDownloadClickListener(listener: (VideoQuality) -> Unit) {
+        onDownloadClicked = listener
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        _binding = BottomSheetQualityBinding.inflate(inflater, container, false)
+        _binding = BottomSheetQualitySelectionBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        setupAudioSection()
+        setupVideoSection()
+        setupDownloadButton()
+    }
 
-        setupAudioRecyclerView()
-        setupVideoRecyclerView()
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
 
-        if (audioOptions.isEmpty() && videoOptions.isEmpty()) {
-            binding.btnDownload.isEnabled = false
+    private fun setupAudioSection() {
+        val audio = audioQuality
+        if (audio == null) {
+            binding.tvAudiosLabel.visibility = View.GONE
+            binding.cardAudio.visibility = View.GONE
+            return
         }
+        binding.tvAudioSize.text = audio.fileSize
+        binding.cardAudio.setOnClickListener {
+            isAudioSelected = true
+            binding.rbAudio.isChecked = true
+            qualityAdapter.clearSelection()
+            setAudioCardStroke(selected = true)
+        }
+    }
 
+    private fun setupVideoSection() {
+        qualityAdapter = QualityAdapter(videoQualities) { _ ->
+            // A video option was selected – clear audio selection
+            isAudioSelected = false
+            binding.rbAudio.isChecked = false
+            setAudioCardStroke(selected = false)
+        }
+        binding.rvQualities.apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = qualityAdapter
+        }
+    }
+
+    private fun setupDownloadButton() {
         binding.btnDownload.setOnClickListener {
-            val selected = when (lastSelectedSource) {
-                SelectionSource.AUDIO -> selectedAudioOption
-                SelectionSource.VIDEO -> selectedVideoOption
-                SelectionSource.NONE -> null
+            val selected: VideoQuality? = when {
+                isAudioSelected -> audioQuality
+                qualityAdapter.selectedPosition >= 0 ->
+                    videoQualities.getOrNull(qualityAdapter.selectedPosition)
+                else -> null
             }
-            if (selected != null) {
-                onDownloadSelected?.invoke(selected)
+            selected?.let {
+                onDownloadClicked?.invoke(it)
                 dismiss()
-            } else {
-                Toast.makeText(requireContext(), "Please select a quality option", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    private fun setupAudioRecyclerView() {
-        if (audioOptions.isEmpty()) {
-            binding.tvAudioHeader.visibility = View.GONE
-            binding.rvAudio.visibility = View.GONE
-            return
-        }
-        selectedAudioOption = audioOptions.first()
-        lastSelectedSource = SelectionSource.AUDIO
-        val adapter = QualityAdapter(audioOptions, 0) { selected ->
-            selectedAudioOption = selected
-            lastSelectedSource = SelectionSource.AUDIO
-        }
-        binding.rvAudio.apply {
-            layoutManager = LinearLayoutManager(requireContext())
-            this.adapter = adapter
-        }
-    }
-
-    private fun setupVideoRecyclerView() {
-        if (videoOptions.isEmpty()) {
-            binding.tvVideoHeader.visibility = View.GONE
-            binding.rvVideo.visibility = View.GONE
-            return
-        }
-        selectedVideoOption = videoOptions.first()
-        lastSelectedSource = SelectionSource.VIDEO
-        val adapter = QualityAdapter(videoOptions, 0) { selected ->
-            selectedVideoOption = selected
-            lastSelectedSource = SelectionSource.VIDEO
-        }
-        binding.rvVideo.apply {
-            layoutManager = LinearLayoutManager(requireContext())
-            this.adapter = adapter
-        }
+    private fun setAudioCardStroke(selected: Boolean) {
+        val strokeColor = ContextCompat.getColor(
+            requireContext(),
+            if (selected) R.color.quality_selected_stroke else R.color.quality_unselected_stroke
+        )
+        binding.cardAudio.strokeColor = strokeColor
+        binding.cardAudio.strokeWidth = resources.getDimensionPixelSize(
+            if (selected) R.dimen.quality_stroke_selected else R.dimen.quality_stroke_default
+        )
     }
 
     override fun onDestroyView() {
@@ -105,15 +137,12 @@ class QualitySelectionBottomSheet : BottomSheetDialogFragment() {
         const val TAG = "QualitySelectionBottomSheet"
 
         fun newInstance(
-            audioOptions: List<QualityOption>,
-            videoOptions: List<QualityOption>,
-            onDownloadSelected: (QualityOption) -> Unit
-        ): QualitySelectionBottomSheet {
-            return QualitySelectionBottomSheet().apply {
-                this.audioOptions = audioOptions
-                this.videoOptions = videoOptions
-                this.onDownloadSelected = onDownloadSelected
-            }
+            audio: VideoQuality?,
+            videos: List<VideoQuality>,
+            onDownload: (VideoQuality) -> Unit
+        ): QualitySelectionBottomSheet = QualitySelectionBottomSheet().also { sheet ->
+            sheet.setQualities(audio, videos)
+            sheet.setOnDownloadClickListener(onDownload)
         }
     }
 }
