@@ -14,6 +14,11 @@
         android:theme="@style/Theme.AndroDM">
 
         <activity
+            android:name=".presentation.VideoDetailActivity"
+            android:exported="false"
+            android:parentActivityName=".presentation.MainActivity" />
+
+        <activity
             android:name=".presentation.MainActivity"
             android:exported="true">
             <intent-filter>

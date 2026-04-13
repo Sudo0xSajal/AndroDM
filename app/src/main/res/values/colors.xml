@@ -30,4 +30,7 @@
     <color name="status_paused">#8E24AA</color>
 
     <color name="progress_track">#BBDEFB</color>
+    <color name="selected_format_bg">#1A6200EE</color>
+    <color name="selected_format_text">#FF6200EE</color>
+    <color name="unselected_format_bg">#FFFFFFFF</color>
 </resources>
