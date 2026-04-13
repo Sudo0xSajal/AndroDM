@@ -91,6 +91,20 @@
                     android:maxLines="3"
                     android:ellipsize="end" />
 
+                <!-- Copy link button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_copy_url"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/copy_link"
+                    android:textSize="13sp"
+                    app:icon="@drawable/ic_copy"
+                    app:iconGravity="textStart"
+                    app:iconSize="16dp"
+                    app:cornerRadius="24dp" />
+
                 <!-- Channel -->
                 <TextView
                     android:id="@+id/tv_channel"
