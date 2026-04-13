@@ -22,7 +22,9 @@ class DownloadManager(private val context: Context) {
             try {
                 val request = Request.Builder().url(download.url).build()
                 val response = HttpClientFactory.client.newCall(request).execute()
+                if (!response.isSuccessful) throw Exception("HTTP ${response.code}: ${response.message}")
                 val body = response.body ?: throw Exception("Empty response body")
+                // contentLength() returns -1 when the server does not send Content-Length
                 val totalBytes = body.contentLength()
 
                 dao.updateDownload(download.copy(id = id, status = DownloadStatus.DOWNLOADING))
@@ -33,6 +35,9 @@ class DownloadManager(private val context: Context) {
                 val file = File(dir, download.filename)
 
                 var downloaded = 0L
+                var lastReportedProgress = -1
+                var lastReportedBytes = 0L
+
                 body.byteStream().use { input ->
                     file.outputStream().use { output ->
                         val buffer = ByteArray(8 * 1024)
@@ -40,21 +45,40 @@ class DownloadManager(private val context: Context) {
                         while (input.read(buffer).also { bytes = it } != -1) {
                             output.write(buffer, 0, bytes)
                             downloaded += bytes
-                            dao.updateDownload(
-                                download.copy(
-                                    id = id,
-                                    totalBytes = totalBytes,
-                                    downloadedBytes = downloaded,
-                                    status = DownloadStatus.DOWNLOADING
+
+                            // Throttle DB writes: update only when progress % changes (when total
+                            // size is known) or when at least 512 KB more has been downloaded
+                            // (when total size is unknown) to avoid flooding the database.
+                            val currentProgress = if (totalBytes > 0)
+                                ((downloaded * 100) / totalBytes).toInt()
+                            else
+                                -1
+
+                            val shouldReport = when {
+                                totalBytes > 0 -> currentProgress != lastReportedProgress
+                                else           -> (downloaded - lastReportedBytes) >= 512 * 1024
+                            }
+
+                            if (shouldReport) {
+                                lastReportedProgress = currentProgress
+                                lastReportedBytes = downloaded
+                                dao.updateDownload(
+                                    download.copy(
+                                        id = id,
+                                        totalBytes = totalBytes,
+                                        downloadedBytes = downloaded,
+                                        status = DownloadStatus.DOWNLOADING
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 }
+
                 dao.updateDownload(
                     download.copy(
                         id = id,
-                        totalBytes = totalBytes,
+                        totalBytes = if (totalBytes > 0) totalBytes else downloaded,
                         downloadedBytes = downloaded,
                         status = DownloadStatus.COMPLETED
                     )

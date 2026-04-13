@@ -1,14 +1,45 @@
 <resources>
     <string name="app_name">AndroDM</string>
     <string name="add_download">Add Download</string>
-    <string name="url_hint">Enter URL</string>
-    <string name="download">Download</string>
+    <string name="url_hint">Paste or type a URL…</string>
+    <string name="download">Start Download</string>
     <string name="cancel">Cancel</string>
-    <string name="no_downloads">No downloads yet</string>
+    <string name="no_downloads">No downloads yet.\nTap + to add one.</string>
+    <string name="quality_demo">Quality Demo</string>
     <string name="notification_channel_name">Downloads</string>
     <string name="notification_channel_desc">Shows active downloads</string>
     <string name="select_to_download">Select to Download</string>
     <string name="audios">Audios</string>
     <string name="videos">Videos</string>
     <string name="audio_only">Audio Only</string>
+    <string name="delete_hint">Long-press to delete</string>
+    <string name="new_download_title">New Download</string>
+    <string name="filename_hint">Filename (auto-detected)</string>
+    <string name="invalid_url">Please enter a valid http(s) URL</string>
+    <string name="content_description_cancel">Cancel download</string>
+
+    <!-- VideoDetailActivity -->
+    <string name="video_detail_title">Video Info</string>
+    <string name="error_invalid_url">Invalid URL</string>
+    <string name="error_enter_url">Please enter a URL</string>
+    <string name="retry">Retry</string>
+    <string name="thumbnail">Thumbnail</string>
+    <string name="duration_label">Duration: %s</string>
+    <string name="select_format">Select Format</string>
+    <string name="download_started">Download started</string>
+    <string name="select_videos">Select Videos</string>
+
+    <!-- Playlist -->
+    <string name="playlist">Playlist</string>
+    <string name="playlist_video_count">%d videos</string>
+    <string name="playlist_selected_count">%d video(s) selected</string>
+    <string name="playlist_all_selected">All videos selected</string>
+    <string name="playlist_video_n">Video %d</string>
+    <string name="range_from">From</string>
+    <string name="range_to">To</string>
+    <string name="apply">Apply</string>
+    <string name="select_all">Select All</string>
+    <string name="clear_selection">Clear</string>
+    <string name="confirm">Confirm</string>
+    <string name="selected">Selected</string>
 </resources>

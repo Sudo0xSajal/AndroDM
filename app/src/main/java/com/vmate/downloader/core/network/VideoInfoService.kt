@@ -11,6 +11,7 @@ object VideoInfoService {
     /** Sentinel value used when a playlist's total video count cannot be determined. */
     const val UNKNOWN_PLAYLIST_COUNT = 50
 
+
     /**
      * Fetches basic video information from a URL using HTTP headers.
      * For direct media URLs, this returns size, mime-type, and a single format entry.
@@ -121,7 +122,7 @@ object VideoInfoService {
 
     private fun extractYouTubeId(url: String): String? {
         val patterns = listOf(
-            Regex("(?:v=|/v/|youtu\.be/|/embed/|/shorts/)([A-Za-z0-9_-]{11})"),
+            Regex("(?:v=|/v/|youtu\\.be/|/embed/|/shorts/)([A-Za-z0-9_-]{11})"),
             Regex("^([A-Za-z0-9_-]{11})$")
         )
         for (pattern in patterns) {
@@ -189,3 +190,4 @@ object VideoInfoService {
         }
     }
 }
+
