@@ -47,7 +47,7 @@ class FormatAdapter(
                     ContextCompat.getColor(context, R.color.unselected_format_bg)
                 )
                 binding.tvQuality.setTextColor(
-                    ContextCompat.getColor(context, android.R.color.darker_gray)
+                    ContextCompat.getColor(context, R.color.on_surface_secondary)
                 )
                 binding.ivSelected.visibility = android.view.View.GONE
             }
