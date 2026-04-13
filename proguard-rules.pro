@@ -10,3 +10,6 @@
 # OkHttp
 -dontwarn okhttp3.**
 -dontwarn okio.**
+
+# Coil
+-dontwarn coil.**

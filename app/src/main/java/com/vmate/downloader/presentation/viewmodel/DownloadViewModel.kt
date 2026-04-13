@@ -5,7 +5,7 @@ import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vmate.downloader.core.network.VideoInfoService
-import com.vmate.downloader.data.local.DownloadDatabase
+import com.vmate.downloader.data.repository.DownloadRepository
 import com.vmate.downloader.domain.models.Download
 import com.vmate.downloader.domain.models.VideoInfo
 import com.vmate.downloader.service.DownloadForegroundService
@@ -19,16 +19,16 @@ import kotlinx.coroutines.launch
 
 class DownloadViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val dao = DownloadDatabase.getInstance(application).downloadDao()
+    private val repository = DownloadRepository(application)
 
-    val downloads: StateFlow<List<Download>> = dao.getAllDownloads()
+    val downloads: StateFlow<List<Download>> = repository.getAllDownloads()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _videoInfoState = MutableStateFlow<VideoInfoState>(VideoInfoState.Idle)
     val videoInfoState: StateFlow<VideoInfoState> = _videoInfoState.asStateFlow()
 
     fun deleteDownload(download: Download) = viewModelScope.launch {
-        dao.deleteDownload(download)
+        repository.deleteDownload(download)
     }
 
     fun cancelDownload(id: Long) {
