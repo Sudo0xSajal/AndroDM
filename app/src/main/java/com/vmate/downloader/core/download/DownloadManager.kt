@@ -16,6 +16,15 @@ class DownloadManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val activeJobs = ConcurrentHashMap<Long, Job>()
 
+    /** Optional callback so the foreground service can update its notification. */
+    var progressCallback: ProgressCallback? = null
+
+    interface ProgressCallback {
+        fun onProgress(id: Long, filename: String, progress: Int, downloadedBytes: Long, totalBytes: Long)
+        fun onComplete(id: Long, filename: String)
+        fun onFailed(id: Long, filename: String, error: String)
+    }
+
     companion object {
         private const val MAX_RETRIES = 3
         private const val RETRY_DELAY_MS = 2_000L
@@ -39,13 +48,14 @@ class DownloadManager(private val context: Context) {
                         lastException = e
                         attempt++
                         if (attempt <= MAX_RETRIES) {
-                            // Exponential backoff before retry: 2s, 4s, 8s (after 1st, 2nd, 3rd failure)
+                            // Exponential backoff before retry: 2s, 4s, 8s
                             delay(RETRY_DELAY_MS * (1L shl (attempt - 1)))
                         }
                     }
                 }
                 if (lastException != null) {
                     dao.updateDownload(download.copy(id = id, status = DownloadStatus.FAILED))
+                    progressCallback?.onFailed(id, download.filename, lastException.message ?: "Unknown error")
                 }
             } catch (e: CancellationException) {
                 dao.updateDownload(download.copy(id = id, status = DownloadStatus.CANCELLED))
@@ -61,18 +71,16 @@ class DownloadManager(private val context: Context) {
         dir.mkdirs()
         val file = File(dir, download.filename)
         // Remove any partial file from a previous attempt before writing.
-        // Ignore the return value: if deletion fails we still attempt the write,
-        // which will overwrite the stale content anyway.
         if (file.exists()) file.delete()
 
         val request = Request.Builder().url(download.url).build()
         HttpClientFactory.client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw Exception("HTTP ${response.code}: ${response.message}")
             val body = response.body ?: throw Exception("Empty response body")
-            // contentLength() returns -1 when the server does not send Content-Length
             val totalBytes = body.contentLength()
 
             dao.updateDownload(download.copy(id = id, status = DownloadStatus.DOWNLOADING))
+            progressCallback?.onProgress(id, download.filename, 0, 0L, totalBytes)
 
             var downloaded = 0L
             var lastReportedProgress = -1
@@ -86,17 +94,13 @@ class DownloadManager(private val context: Context) {
                         output.write(buffer, 0, bytes)
                         downloaded += bytes
 
-                        // Throttle DB writes: update only when progress % changes (when total
-                        // size is known) or when at least 512 KB more has been downloaded
-                        // (when total size is unknown) to avoid flooding the database.
                         val currentProgress = if (totalBytes > 0)
                             ((downloaded * 100) / totalBytes).toInt()
-                        else
-                            -1
+                        else -1
 
                         val shouldReport = when {
                             totalBytes > 0 -> currentProgress != lastReportedProgress
-                            else           -> (downloaded - lastReportedBytes) >= 512 * 1024
+                            else -> (downloaded - lastReportedBytes) >= 512 * 1024
                         }
 
                         if (shouldReport) {
@@ -110,6 +114,11 @@ class DownloadManager(private val context: Context) {
                                     status = DownloadStatus.DOWNLOADING
                                 )
                             )
+                            if (currentProgress >= 0) {
+                                progressCallback?.onProgress(
+                                    id, download.filename, currentProgress, downloaded, totalBytes
+                                )
+                            }
                         }
                     }
                 }
@@ -123,6 +132,7 @@ class DownloadManager(private val context: Context) {
                     status = DownloadStatus.COMPLETED
                 )
             )
+            progressCallback?.onComplete(id, download.filename)
         }
     }
 

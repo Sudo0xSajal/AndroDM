@@ -1,23 +1,34 @@
 package com.vmate.downloader.presentation
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import coil.load
 import coil.transform.RoundedCornersTransformation
+import com.google.android.material.snackbar.Snackbar
 import com.vmate.downloader.R
 import com.vmate.downloader.databinding.ActivityVideoDetailBinding
 import com.vmate.downloader.domain.models.Download
 import com.vmate.downloader.domain.models.FormatInfo
 import com.vmate.downloader.domain.models.VideoInfo
+import com.vmate.downloader.domain.models.VideoQuality
+import com.vmate.downloader.presentation.ui.fragments.DownloadConfirmationBottomSheet
 import com.vmate.downloader.presentation.ui.fragments.FormatSelectionFragment
 import com.vmate.downloader.presentation.ui.fragments.PlaylistFragment
+import com.vmate.downloader.presentation.ui.fragments.QualitySelectionBottomSheet
 import com.vmate.downloader.presentation.viewmodel.DownloadViewModel
 import com.vmate.downloader.service.DownloadForegroundService
+import com.vmate.downloader.util.ConnectivityChecker
+import com.vmate.downloader.util.StorageChecker
 import kotlinx.coroutines.launch
 
 class VideoDetailActivity : AppCompatActivity() {
@@ -27,6 +38,7 @@ class VideoDetailActivity : AppCompatActivity() {
 
     private var selectedFormat: FormatInfo? = null
     private var currentVideoInfo: VideoInfo? = null
+    private var currentUrl: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,16 +55,29 @@ class VideoDetailActivity : AppCompatActivity() {
             finish()
             return
         }
+        currentUrl = url
 
-        observeVideoInfo()
-        viewModel.fetchVideoInfo(url)
-
-        binding.btnRetry.setOnClickListener {
+        if (!ConnectivityChecker.isConnected(this)) {
+            showError(getString(R.string.error_no_internet))
+        } else {
+            observeVideoInfo()
             viewModel.fetchVideoInfo(url)
         }
 
+        binding.btnRetry.setOnClickListener {
+            if (!ConnectivityChecker.isConnected(this)) {
+                showError(getString(R.string.error_no_internet))
+                return@setOnClickListener
+            }
+            viewModel.fetchVideoInfo(url)
+        }
+
+        binding.btnCopyUrl.setOnClickListener { view ->
+            copyUrlToClipboard(view)
+        }
+
         binding.btnDownload.setOnClickListener {
-            startDownload()
+            showQualitySelection()
         }
 
         binding.btnSelectFormat.setOnClickListener {
@@ -80,12 +105,8 @@ class VideoDetailActivity : AppCompatActivity() {
         lifecycleScope.launch {
             viewModel.videoInfoState.collect { state ->
                 when (state) {
-                    is DownloadViewModel.VideoInfoState.Idle -> {
-                        showLoading(true)
-                    }
-                    is DownloadViewModel.VideoInfoState.Loading -> {
-                        showLoading(true)
-                    }
+                    is DownloadViewModel.VideoInfoState.Idle -> showLoading(true)
+                    is DownloadViewModel.VideoInfoState.Loading -> showLoading(true)
                     is DownloadViewModel.VideoInfoState.Success -> {
                         showLoading(false)
                         displayVideoInfo(state.info)
@@ -128,16 +149,15 @@ class VideoDetailActivity : AppCompatActivity() {
             binding.tvPlaylistTitle.text = info.playlistTitle ?: getString(R.string.playlist)
             binding.tvPlaylistCount.text =
                 getString(R.string.playlist_video_count, info.playlistCount)
-            binding.tvPlaylistSelection.text =
-                getString(R.string.playlist_all_selected)
+            binding.tvPlaylistSelection.text = getString(R.string.playlist_all_selected)
         } else {
             binding.playlistGroup.visibility = View.GONE
         }
 
         val allFormats = info.formats
         if (allFormats.isNotEmpty()) {
-            selectedFormat = allFormats.first()
-            updateSelectedFormatDisplay(allFormats.first())
+            selectedFormat = allFormats.firstOrNull { !it.isAudioOnly } ?: allFormats.first()
+            updateSelectedFormatDisplay(selectedFormat!!)
             binding.btnSelectFormat.visibility = View.VISIBLE
         } else {
             binding.btnSelectFormat.visibility = View.GONE
@@ -151,18 +171,96 @@ class VideoDetailActivity : AppCompatActivity() {
         binding.tvSelectedFormat.visibility = View.VISIBLE
     }
 
-    private fun startDownload() {
-        val info = currentVideoInfo ?: return
-        val format = selectedFormat
+    // ─── Copy-to-clipboard ───────────────────────────────────────────────────
 
-        val downloadUrl = format?.url ?: info.url
+    private fun copyUrlToClipboard(view: View) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("video_url", currentUrl))
+
+        // Haptic feedback
+        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+
+        // Swap icon to checkmark temporarily
+        binding.btnCopyUrl.setIconResource(R.drawable.ic_check)
+        binding.btnCopyUrl.iconTint = ContextCompat.getColorStateList(this, R.color.copy_success)
+
+        Snackbar.make(binding.root, R.string.copied_to_clipboard, Snackbar.LENGTH_SHORT).show()
+
+        // Reset icon after 2 s
+        binding.btnCopyUrl.postDelayed({
+            binding.btnCopyUrl.setIconResource(R.drawable.ic_copy)
+            binding.btnCopyUrl.iconTint = null
+        }, 2_000L)
+    }
+
+    // ─── Quality selection → confirmation → download ─────────────────────────
+
+    private fun showQualitySelection() {
+        val info = currentVideoInfo ?: return
+        val duration = info.durationSeconds
+
+        val audioFormat = info.audioFormats().firstOrNull()
+        val videoFormats = info.videoFormats()
+
+        if (videoFormats.isEmpty() && audioFormat == null) {
+            Toast.makeText(this, getString(R.string.error_no_format), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val audioQuality = audioFormat?.let {
+            VideoQuality(
+                quality = it.qualityLabel(),
+                fileSize = it.fileSizeLabel(duration),
+                url = it.url
+            )
+        }
+
+        val videoQualities = videoFormats.map { fmt ->
+            VideoQuality(
+                quality = fmt.quality,
+                fileSize = fmt.fileSizeLabel(duration),
+                url = fmt.url
+            )
+        }
+
+        QualitySelectionBottomSheet.newInstance(audioQuality, videoQualities) { selected ->
+            showDownloadConfirmation(info, selected)
+        }.show(supportFragmentManager, QualitySelectionBottomSheet.TAG)
+    }
+
+    private fun showDownloadConfirmation(info: VideoInfo, quality: VideoQuality) {
+        DownloadConfirmationBottomSheet.newInstance(
+            title = info.title,
+            quality = quality.quality,
+            fileSize = quality.fileSize
+        ) {
+            executeDownload(info, quality)
+        }.show(supportFragmentManager, DownloadConfirmationBottomSheet.TAG)
+    }
+
+    private fun executeDownload(info: VideoInfo, quality: VideoQuality) {
+        if (!ConnectivityChecker.isConnected(this)) {
+            Toast.makeText(this, getString(R.string.error_no_internet), Toast.LENGTH_LONG).show()
+            return
+        }
+
+        // Estimate required bytes for storage check (best-effort)
+        val requiredBytes = info.formats
+            .firstOrNull { it.url == quality.url }
+            ?.estimatedSizeBytes(info.durationSeconds) ?: 0L
+
+        if (!StorageChecker.hasEnoughSpace(requiredBytes)) {
+            Toast.makeText(this, getString(R.string.error_insufficient_storage), Toast.LENGTH_LONG)
+                .show()
+            return
+        }
+
+        // Prefer the FormatInfo matching this quality URL, fall back to selectedFormat
+        val format = info.formats.firstOrNull { it.url == quality.url } ?: selectedFormat
+        val downloadUrl = format?.url ?: quality.url
         val filename = buildFilename(info, format)
 
-        val download = Download(
-            url = downloadUrl,
-            filename = filename
-        )
-
+        val download = Download(url = downloadUrl, filename = filename)
         val intent = Intent(this, DownloadForegroundService::class.java).apply {
             action = DownloadForegroundService.ACTION_START
             putExtra(DownloadForegroundService.EXTRA_DOWNLOAD, download)
@@ -181,6 +279,8 @@ class VideoDetailActivity : AppCompatActivity() {
         val ext = format?.ext ?: "mp4"
         return "$safeName.$ext"
     }
+
+    // ─── UI state helpers ─────────────────────────────────────────────────────
 
     private fun showLoading(isLoading: Boolean) {
         binding.progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
@@ -211,3 +311,4 @@ class VideoDetailActivity : AppCompatActivity() {
         const val TAG = "VideoDetailActivity"
     }
 }
+

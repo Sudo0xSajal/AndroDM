@@ -1,7 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Dark-mode surface & background overrides -->
+    <color name="background">#121212</color>
+    <color name="surface">#1E1E1E</color>
+    <color name="on_surface">#E0E0E0</color>
+    <color name="on_surface_secondary">#9E9E9E</color>
+    <color name="divider">#2E2E2E</color>
+
+    <!-- Dark drag handle -->
     <color name="bottom_sheet_handle">#555555</color>
-    <color name="selected_format_bg">#2A6200EE</color>
+    <color name="drag_handle">#FF555555</color>
+
+    <!-- Format / quality selection in dark -->
+    <color name="selected_format_bg">#2A5E92F3</color>
     <color name="selected_format_text">#FFBB86FC</color>
     <color name="unselected_format_bg">#FF1E1E1E</color>
+    <color name="quality_selected_stroke">#5E92F3</color>
+
+    <!-- Progress track dark -->
+    <color name="progress_track">#1E3A5F</color>
+
+    <!-- Copy success in dark -->
+    <color name="copy_success">#66BB6A</color>
 </resources>

@@ -7,7 +7,7 @@
     <string name="no_downloads">No downloads yet.\nTap + to add one.</string>
     <string name="notification_channel_name">Downloads</string>
     <string name="notification_channel_desc">Shows active downloads</string>
-    <string name="select_to_download">Select to Download</string>
+    <string name="select_to_download">Select Quality</string>
     <string name="audios">Audios</string>
     <string name="videos">Videos</string>
     <string name="audio_only">Audio Only</string>
@@ -27,6 +27,33 @@
     <string name="select_format">Select Format</string>
     <string name="download_started">Download started</string>
     <string name="select_videos">Select Videos</string>
+
+    <!-- Copy to clipboard -->
+    <string name="copy_link">Copy Link</string>
+    <string name="copied_to_clipboard">Link copied to clipboard</string>
+
+    <!-- Download confirmation sheet -->
+    <string name="confirm_download_title">Ready to Download?</string>
+    <string name="confirm_download_quality_label">Quality</string>
+    <string name="confirm_download_size_label">Est. File Size</string>
+    <string name="confirm_download_btn">Confirm Download</string>
+    <string name="size_unknown">Unknown size</string>
+    <string name="size_estimated_prefix">~</string>
+
+    <!-- Edge-case / error messages -->
+    <string name="error_no_internet">No internet connection. Please check your network.</string>
+    <string name="error_storage_permission">Storage permission denied. Cannot save the file.</string>
+    <string name="error_insufficient_storage">Not enough storage space to complete this download.</string>
+    <string name="error_fetch_failed">Could not fetch video info. Please check the URL.</string>
+    <string name="error_no_format">No downloadable format found for this URL.</string>
+    <string name="error_file_exists">A file with this name already exists.</string>
+
+    <!-- Notifications -->
+    <string name="notification_download_complete">Download complete</string>
+    <string name="notification_download_failed">Download failed</string>
+    <string name="notification_downloading">Downloading…</string>
+    <string name="notification_progress">%1$s — %2$d%%</string>
+    <string name="notification_action_cancel">Cancel</string>
 
     <!-- Playlist -->
     <string name="playlist">Playlist</string>
