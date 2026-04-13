@@ -136,23 +136,25 @@ object VideoInfoService {
         url.contains("list=") || url.contains("/playlist")
 
     private fun buildDefaultVideoFormats(url: String): List<FormatInfo> {
+        // (label, typicalTotalBitrateKbps, formatId)
+        // tbr values are typical combined video+audio bitrates for each resolution.
         val qualities = listOf(
-            Triple("1080p", 1080, "hd1080"),
-            Triple("720p", 720, "hd720"),
-            Triple("480p", 480, "large"),
-            Triple("360p", 360, "medium"),
-            Triple("240p", 240, "small")
+            Triple("1080p", 2800.0, "hd1080"),
+            Triple("720p",  1700.0, "hd720"),
+            Triple("480p",   950.0, "large"),
+            Triple("360p",   550.0, "medium"),
+            Triple("240p",   320.0, "small")
         )
-        return qualities.map { (label, _, formatId) ->
+        return qualities.map { (label, bitrate, formatId) ->
             FormatInfo(
                 formatId = formatId,
                 ext = "mp4",
                 resolution = label,
                 fps = 30,
                 filesize = null,
-                tbr = null,
-                vbr = null,
-                abr = null,
+                tbr = bitrate,
+                vbr = bitrate * 0.9,
+                abr = 128.0,
                 acodec = "aac",
                 vcodec = "h264",
                 quality = label,

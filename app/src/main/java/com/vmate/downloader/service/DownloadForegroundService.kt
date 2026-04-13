@@ -15,9 +15,48 @@ class DownloadForegroundService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        downloadManager = DownloadManager(this)
         notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel()
+
+        downloadManager = DownloadManager(this).also { mgr ->
+            mgr.progressCallback = object : DownloadManager.ProgressCallback {
+                override fun onProgress(
+                    id: Long,
+                    filename: String,
+                    progress: Int,
+                    downloadedBytes: Long,
+                    totalBytes: Long
+                ) {
+                    val text = getString(R.string.notification_progress, filename, progress)
+                    notificationManager.notify(
+                        NOTIFICATION_ID,
+                        buildProgressNotification(text, progress, indeterminate = progress <= 0)
+                    )
+                }
+
+                override fun onComplete(id: Long, filename: String) {
+                    notificationManager.cancel(NOTIFICATION_ID)
+                    notificationManager.notify(
+                        (NOTIFICATION_ID + id).toInt(),
+                        buildSimpleNotification(
+                            title = getString(R.string.notification_download_complete),
+                            text = filename
+                        )
+                    )
+                }
+
+                override fun onFailed(id: Long, filename: String, error: String) {
+                    notificationManager.cancel(NOTIFICATION_ID)
+                    notificationManager.notify(
+                        (NOTIFICATION_ID + id).toInt(),
+                        buildSimpleNotification(
+                            title = getString(R.string.notification_download_failed),
+                            text = filename
+                        )
+                    )
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -30,7 +69,10 @@ class DownloadForegroundService : Service() {
                     intent.getParcelableExtra(EXTRA_DOWNLOAD)
                 }
                 download?.let {
-                    startForeground(NOTIFICATION_ID, buildNotification("Starting download: ${it.filename}"))
+                    startForeground(
+                        NOTIFICATION_ID,
+                        buildProgressNotification(it.filename, 0, indeterminate = true)
+                    )
                     downloadManager.startDownload(it)
                 }
             }
@@ -67,11 +109,41 @@ class DownloadForegroundService : Service() {
         }
     }
 
-    private fun buildNotification(text: String): Notification {
+    private fun buildProgressNotification(
+        text: String,
+        progress: Int,
+        indeterminate: Boolean
+    ): Notification {
+        val cancelIntent = Intent(this, DownloadNotificationReceiver::class.java).apply {
+            action = DownloadNotificationReceiver.ACTION_CANCEL
+        }
+        val cancelPendingIntent = PendingIntent.getBroadcast(
+            this, 0, cancelIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.app_name))
+            .setContentTitle(getString(R.string.notification_downloading))
             .setContentText(text)
             .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setProgress(100, progress, indeterminate)
+            .setOngoing(true)
+            .addAction(
+                Notification.Action.Builder(
+                    null,
+                    getString(R.string.notification_action_cancel),
+                    cancelPendingIntent
+                ).build()
+            )
+            .build()
+    }
+
+    private fun buildSimpleNotification(title: String, text: String): Notification {
+        return Notification.Builder(this, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setAutoCancel(true)
             .build()
     }
 
