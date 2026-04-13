@@ -41,7 +41,9 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun fetchVideoInfo(url: String) {
-        if (_videoInfoState.value is VideoInfoState.Loading) return
+        val current = _videoInfoState.value
+        // Do not start a new fetch if one is already in-flight or data is already loaded.
+        if (current is VideoInfoState.Loading || current is VideoInfoState.Success) return
         _videoInfoState.value = VideoInfoState.Loading
         viewModelScope.launch(Dispatchers.IO) {
             val info = VideoInfoService.fetchVideoInfo(url)

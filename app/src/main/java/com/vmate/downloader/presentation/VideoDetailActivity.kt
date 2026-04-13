@@ -11,7 +11,9 @@ import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import coil.load
 import coil.transform.RoundedCornersTransformation
 import com.google.android.material.snackbar.Snackbar
@@ -57,10 +59,13 @@ class VideoDetailActivity : AppCompatActivity() {
         }
         currentUrl = url
 
+        // Always set up the state observer, regardless of connectivity,
+        // so the retry button can trigger a fetch that updates the UI.
+        observeVideoInfo()
+
         if (!ConnectivityChecker.isConnected(this)) {
             showError(getString(R.string.error_no_internet))
         } else {
-            observeVideoInfo()
             viewModel.fetchVideoInfo(url)
         }
 
@@ -103,17 +108,22 @@ class VideoDetailActivity : AppCompatActivity() {
 
     private fun observeVideoInfo() {
         lifecycleScope.launch {
-            viewModel.videoInfoState.collect { state ->
-                when (state) {
-                    is DownloadViewModel.VideoInfoState.Idle -> showLoading(true)
-                    is DownloadViewModel.VideoInfoState.Loading -> showLoading(true)
-                    is DownloadViewModel.VideoInfoState.Success -> {
-                        showLoading(false)
-                        displayVideoInfo(state.info)
-                    }
-                    is DownloadViewModel.VideoInfoState.Error -> {
-                        showLoading(false)
-                        showError(state.message)
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.videoInfoState.collect { state ->
+                    when (state) {
+                        is DownloadViewModel.VideoInfoState.Idle -> {
+                            // No-op: initial state before a fetch is triggered.
+                            // The UI is already set up by the connectivity check in onCreate.
+                        }
+                        is DownloadViewModel.VideoInfoState.Loading -> showLoading(true)
+                        is DownloadViewModel.VideoInfoState.Success -> {
+                            showLoading(false)
+                            displayVideoInfo(state.info)
+                        }
+                        is DownloadViewModel.VideoInfoState.Error -> {
+                            showLoading(false)
+                            showError(state.message)
+                        }
                     }
                 }
             }
@@ -186,10 +196,12 @@ class VideoDetailActivity : AppCompatActivity() {
 
         Snackbar.make(binding.root, R.string.copied_to_clipboard, Snackbar.LENGTH_SHORT).show()
 
-        // Reset icon after 2 s
+        // Reset icon after 2 s; guard against view being destroyed before the delay fires.
         binding.btnCopyUrl.postDelayed({
-            binding.btnCopyUrl.setIconResource(R.drawable.ic_copy)
-            binding.btnCopyUrl.iconTint = null
+            if (_binding != null) {
+                binding.btnCopyUrl.setIconResource(R.drawable.ic_copy)
+                binding.btnCopyUrl.iconTint = null
+            }
         }, 2_000L)
     }
 
@@ -302,7 +314,9 @@ class VideoDetailActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        viewModel.resetVideoInfo()
+        // Only reset ViewModel state when the activity is truly finishing (e.g., back navigation),
+        // not on configuration changes (rotation) where the ViewModel should be retained.
+        if (isFinishing) viewModel.resetVideoInfo()
         super.onDestroy()
     }
 
