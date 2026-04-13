@@ -198,7 +198,7 @@ class VideoDetailActivity : AppCompatActivity() {
 
         // Reset icon after 2 s; guard against view being destroyed before the delay fires.
         binding.btnCopyUrl.postDelayed({
-            if (_binding != null) {
+            if (!isDestroyed && !isFinishing) {
                 binding.btnCopyUrl.setIconResource(R.drawable.ic_copy)
                 binding.btnCopyUrl.iconTint = null
             }
