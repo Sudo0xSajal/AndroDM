@@ -2,7 +2,7 @@ package com.vmate.downloader.domain.models
 
 data class DownloadPreferences(
     val extractAudio: Boolean = false,
-    val videoQuality: VideoQuality = VideoQuality.BEST,
+    val videoQuality: PreferredVideoQuality = PreferredVideoQuality.BEST,
     val videoFormat: VideoFormat = VideoFormat.MP4,
     val audioQuality: AudioQuality = AudioQuality.BEST,
     val audioFormat: AudioFormat = AudioFormat.MP3,
@@ -16,7 +16,7 @@ data class DownloadPreferences(
     val subdirectoryByPlaylist: Boolean = false
 )
 
-enum class VideoQuality(val label: String, val height: Int?) {
+enum class PreferredVideoQuality(val label: String, val height: Int?) {
     BEST("Best", null),
     P1080("1080p", 1080),
     P720("720p", 720),
