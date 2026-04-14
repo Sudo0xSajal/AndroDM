@@ -298,12 +298,14 @@ object VideoInfoService {
             val f = jsonArray.getJSONObject(i)
             // Prefer a direct URL; fall back to extracting the base URL from the
             // signatureCipher/cipher field (present when YouTube encrypts stream URLs).
-            val streamUrl = f.optString("url", "").ifBlank {
+            val directUrl = f.optString("url", "")
+            val streamUrl = if (directUrl.isNotBlank()) {
+                directUrl
+            } else {
                 val cipher = f.optString("signatureCipher", "")
                     .ifBlank { f.optString("cipher", "") }
                 if (cipher.isNotBlank()) extractUrlFromCipher(cipher) else null
             } ?: continue
-            if (streamUrl.isBlank()) continue
             output.add(
                 InnerTubeStream(
                     itag = f.optInt("itag"),
