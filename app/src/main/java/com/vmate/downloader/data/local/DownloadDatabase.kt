@@ -21,7 +21,7 @@ abstract class DownloadDatabase : RoomDatabase() {
                     context.applicationContext,
                     DownloadDatabase::class.java,
                     "downloads.db"
-                ).build().also { INSTANCE = it }
+                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
             }
     }
 }
