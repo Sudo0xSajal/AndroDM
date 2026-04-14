@@ -62,11 +62,14 @@ object VideoInfoService {
             ?: oembedData?.thumbnailUrl
             ?: if (videoId.isNotEmpty()) "https://img.youtube.com/vi/$videoId/hqdefault.jpg" else null
 
+        // Only use formats that have real direct stream URLs from InnerTube.
+        // Do NOT fall back to placeholder formats using the YouTube page URL — downloading
+        // that URL would fetch the HTML page (~1 MB) instead of actual video content.
         val formats: List<FormatInfo> =
             if (innerTubeData != null && innerTubeData.formats.isNotEmpty()) {
                 innerTubeData.formats.mapNotNull { innerTubeStreamToFormatInfo(it) }
             } else {
-                buildDefaultVideoFormats(url) + buildDefaultAudioFormats(url)
+                emptyList()
             }
 
         return VideoInfo(
@@ -140,21 +143,61 @@ object VideoInfoService {
         val formats: List<InnerTubeStream>
     )
 
+    private data class InnerTubeClientConfig(
+        val clientName: String,
+        val clientVersion: String,
+        val androidSdkVersion: Int?,
+        val userAgent: String
+    )
+
     /**
-     * Queries the YouTube InnerTube player endpoint using the ANDROID_TESTSUITE client,
-     * which typically returns direct (non-ciphered) stream URLs.
+     * Queries the YouTube InnerTube player endpoint, trying multiple client configurations
+     * in order until one returns direct (non-ciphered) stream URLs.
      */
     private fun fetchYouTubeInnerTube(videoId: String): InnerTubeData? {
+        val clients = listOf(
+            InnerTubeClientConfig(
+                clientName = "ANDROID_TESTSUITE",
+                clientVersion = "1.9",
+                androidSdkVersion = 30,
+                userAgent = "com.google.android.youtube/1.9 (Linux; U; Android 10) gzip"
+            ),
+            InnerTubeClientConfig(
+                clientName = "ANDROID",
+                clientVersion = "19.09.37",
+                androidSdkVersion = 30,
+                userAgent = "com.google.android.youtube/19.09.37 (Linux; U; Android 10) gzip"
+            ),
+            InnerTubeClientConfig(
+                clientName = "IOS",
+                clientVersion = "19.09.3",
+                androidSdkVersion = null,
+                userAgent = "com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)"
+            )
+        )
+
+        for (client in clients) {
+            val result = fetchYouTubeInnerTubeWithClient(videoId, client)
+            if (result != null && result.formats.isNotEmpty()) return result
+        }
+        return null
+    }
+
+    private fun fetchYouTubeInnerTubeWithClient(
+        videoId: String,
+        client: InnerTubeClientConfig
+    ): InnerTubeData? {
         return try {
+            val clientJson = JSONObject().apply {
+                put("clientName", client.clientName)
+                put("clientVersion", client.clientVersion)
+                if (client.androidSdkVersion != null) put("androidSdkVersion", client.androidSdkVersion)
+                put("hl", "en")
+                put("gl", "US")
+            }
             val bodyJson = JSONObject().apply {
                 put("context", JSONObject().apply {
-                    put("client", JSONObject().apply {
-                        put("clientName", "ANDROID_TESTSUITE")
-                        put("clientVersion", "1.9")
-                        put("androidSdkVersion", 30)
-                        put("hl", "en")
-                        put("gl", "US")
-                    })
+                    put("client", clientJson)
                 })
                 put("videoId", videoId)
             }.toString()
@@ -162,10 +205,7 @@ object VideoInfoService {
             val request = Request.Builder()
                 .url("https://www.youtube.com/youtubei/v1/player")
                 .post(bodyJson.toRequestBody("application/json".toMediaType()))
-                .header(
-                    "User-Agent",
-                    "com.google.android.youtube/1.9 (Linux; U; Android 10) gzip"
-                )
+                .header("User-Agent", client.userAgent)
                 .build()
 
             val response = HttpClientFactory.client.newCall(request).execute()
@@ -335,62 +375,5 @@ object VideoInfoService {
 
     private fun isYouTubePlaylist(url: String): Boolean =
         url.contains("list=") || url.contains("/playlist")
-
-    private fun buildDefaultVideoFormats(url: String): List<FormatInfo> {
-        // (label, typicalTotalBitrateKbps, formatId)
-        // tbr values are typical combined video+audio bitrates for each resolution.
-        val qualities = listOf(
-            Triple("1080p", 2800.0, "hd1080"),
-            Triple("720p",  1700.0, "hd720"),
-            Triple("480p",   950.0, "large"),
-            Triple("360p",   550.0, "medium"),
-            Triple("240p",   320.0, "small")
-        )
-        return qualities.map { (label, bitrate, formatId) ->
-            FormatInfo(
-                formatId = formatId,
-                ext = "mp4",
-                resolution = label,
-                fps = 30,
-                filesize = null,
-                tbr = bitrate,
-                vbr = bitrate * 0.9,
-                abr = 128.0,
-                acodec = "aac",
-                vcodec = "h264",
-                quality = label,
-                isAudioOnly = false,
-                isVideoOnly = false,
-                url = url
-            )
-        }
-    }
-
-    private fun buildDefaultAudioFormats(url: String): List<FormatInfo> {
-        val qualities = listOf(
-            Triple("320kbps", 320.0, "bestaudio-320"),
-            Triple("256kbps", 256.0, "bestaudio-256"),
-            Triple("192kbps", 192.0, "bestaudio-192"),
-            Triple("128kbps", 128.0, "bestaudio-128")
-        )
-        return qualities.map { (label, bitrate, formatId) ->
-            FormatInfo(
-                formatId = formatId,
-                ext = "mp3",
-                resolution = null,
-                fps = null,
-                filesize = null,
-                tbr = bitrate,
-                vbr = null,
-                abr = bitrate,
-                acodec = "mp3",
-                vcodec = null,
-                quality = label,
-                isAudioOnly = true,
-                isVideoOnly = false,
-                url = url
-            )
-        }
-    }
 }
 
