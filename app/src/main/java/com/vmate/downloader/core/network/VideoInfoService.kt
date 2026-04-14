@@ -9,6 +9,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URL
+import java.net.URLDecoder
 import java.net.URLEncoder
 
 object VideoInfoService {
@@ -145,6 +146,7 @@ object VideoInfoService {
 
     private data class InnerTubeClientConfig(
         val clientName: String,
+        val clientId: Int,
         val clientVersion: String,
         val androidSdkVersion: Int?,
         val userAgent: String
@@ -158,21 +160,31 @@ object VideoInfoService {
         val clients = listOf(
             InnerTubeClientConfig(
                 clientName = "ANDROID_TESTSUITE",
+                clientId = 30,
                 clientVersion = "1.9",
                 androidSdkVersion = 30,
                 userAgent = "com.google.android.youtube/1.9 (Linux; U; Android 10) gzip"
             ),
             InnerTubeClientConfig(
-                clientName = "ANDROID",
-                clientVersion = "19.09.37",
+                clientName = "ANDROID_CREATOR",
+                clientId = 14,
+                clientVersion = "24.45.100",
                 androidSdkVersion = 30,
-                userAgent = "com.google.android.youtube/19.09.37 (Linux; U; Android 10) gzip"
+                userAgent = "com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 10) gzip"
+            ),
+            InnerTubeClientConfig(
+                clientName = "ANDROID",
+                clientId = 3,
+                clientVersion = "19.44.38",
+                androidSdkVersion = 30,
+                userAgent = "com.google.android.youtube/19.44.38 (Linux; U; Android 10) gzip"
             ),
             InnerTubeClientConfig(
                 clientName = "IOS",
-                clientVersion = "19.09.3",
+                clientId = 5,
+                clientVersion = "19.45.4",
                 androidSdkVersion = null,
-                userAgent = "com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)"
+                userAgent = "com.google.ios.youtube/19.45.4 (iPhone14,3; U; CPU iOS 16_0 like Mac OS X)"
             )
         )
 
@@ -191,7 +203,11 @@ object VideoInfoService {
             val clientJson = JSONObject().apply {
                 put("clientName", client.clientName)
                 put("clientVersion", client.clientVersion)
-                if (client.androidSdkVersion != null) put("androidSdkVersion", client.androidSdkVersion)
+                if (client.androidSdkVersion != null) {
+                    put("androidSdkVersion", client.androidSdkVersion)
+                    put("osName", "Android")
+                    put("osVersion", "10.0")
+                }
                 put("hl", "en")
                 put("gl", "US")
             }
@@ -200,12 +216,17 @@ object VideoInfoService {
                     put("client", clientJson)
                 })
                 put("videoId", videoId)
+                put("contentCheckOk", true)
+                put("racyCheckOk", true)
             }.toString()
 
             val request = Request.Builder()
                 .url("https://www.youtube.com/youtubei/v1/player")
                 .post(bodyJson.toRequestBody("application/json".toMediaType()))
                 .header("User-Agent", client.userAgent)
+                .header("X-Youtube-Client-Name", client.clientId.toString())
+                .header("X-Youtube-Client-Version", client.clientVersion)
+                .header("Content-Type", "application/json")
                 .build()
 
             val response = HttpClientFactory.client.newCall(request).execute()
@@ -250,6 +271,24 @@ object VideoInfoService {
         }
     }
 
+    /**
+     * Extracts the `url` parameter from a `signatureCipher` or `cipher` value.
+     * These are URL-encoded strings of the form `s=...&sp=...&url=BASE_URL`.
+     * We extract only the base URL; the download manager will attempt the
+     * request and YouTube's CDN may still serve the content without enforcing
+     * the signature for some streams.
+     */
+    private fun extractUrlFromCipher(cipher: String): String? {
+        return try {
+            cipher.split("&").associate { pair ->
+                val idx = pair.indexOf('=')
+                if (idx < 0) pair to "" else pair.substring(0, idx) to pair.substring(idx + 1)
+            }["url"]?.let { URLDecoder.decode(it, "UTF-8") }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun parseInnerTubeFormats(
         jsonArray: JSONArray?,
         output: MutableList<InnerTubeStream>
@@ -257,8 +296,13 @@ object VideoInfoService {
         jsonArray ?: return
         for (i in 0 until jsonArray.length()) {
             val f = jsonArray.getJSONObject(i)
-            // Skip formats that require signature decryption (no direct URL present)
-            val streamUrl = f.optString("url", "")
+            // Prefer a direct URL; fall back to extracting the base URL from the
+            // signatureCipher/cipher field (present when YouTube encrypts stream URLs).
+            val streamUrl = f.optString("url", "").ifBlank {
+                val cipher = f.optString("signatureCipher", "")
+                    .ifBlank { f.optString("cipher", "") }
+                if (cipher.isNotBlank()) extractUrlFromCipher(cipher) else null
+            } ?: continue
             if (streamUrl.isBlank()) continue
             output.add(
                 InnerTubeStream(
