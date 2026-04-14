@@ -169,11 +169,13 @@ class VideoDetailActivity : AppCompatActivity() {
             selectedFormat = allFormats.firstOrNull { !it.isAudioOnly } ?: allFormats.first()
             updateSelectedFormatDisplay(selectedFormat!!)
             binding.btnSelectFormat.visibility = View.VISIBLE
+            binding.btnDownload.isEnabled = true
         } else {
             binding.btnSelectFormat.visibility = View.GONE
+            binding.tvSelectedFormat.text = getString(R.string.error_no_format)
+            binding.tvSelectedFormat.visibility = View.VISIBLE
+            binding.btnDownload.isEnabled = false
         }
-
-        binding.btnDownload.isEnabled = true
     }
 
     private fun updateSelectedFormatDisplay(format: FormatInfo) {
