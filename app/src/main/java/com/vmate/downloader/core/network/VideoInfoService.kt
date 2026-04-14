@@ -3,8 +3,13 @@ package com.vmate.downloader.core.network
 import androidx.annotation.WorkerThread
 import com.vmate.downloader.domain.models.FormatInfo
 import com.vmate.downloader.domain.models.VideoInfo
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
 import java.net.URL
+import java.net.URLEncoder
 
 object VideoInfoService {
 
@@ -15,8 +20,7 @@ object VideoInfoService {
     /**
      * Fetches basic video information from a URL using HTTP headers.
      * For direct media URLs, this returns size, mime-type, and a single format entry.
-     * For YouTube/platform URLs, metadata is extracted from the URL pattern
-     * and populated as best-effort.
+     * For YouTube/platform URLs, metadata is fetched via the oEmbed and InnerTube APIs.
      */
     @WorkerThread
     fun fetchVideoInfo(url: String): VideoInfo? {
@@ -39,31 +43,228 @@ object VideoInfoService {
 
     private fun buildYouTubeInfo(url: String): VideoInfo {
         val videoId = extractYouTubeId(url) ?: ""
-        val thumbnailUrl = if (videoId.isNotEmpty())
-            "https://img.youtube.com/vi/$videoId/hqdefault.jpg" else null
-
         val isPlaylist = isYouTubePlaylist(url)
-        val formats = buildDefaultVideoFormats(url)
-        val audioFormats = buildDefaultAudioFormats(url)
+
+        // Fetch real metadata: try InnerTube first, oEmbed as fallback
+        val innerTubeData = if (videoId.isNotEmpty() && !isPlaylist) {
+            fetchYouTubeInnerTube(videoId)
+        } else null
+        val oembedData = fetchYouTubeOembed(url)
+
+        val title = when {
+            innerTubeData?.title?.isNotBlank() == true -> innerTubeData.title
+            oembedData?.title?.isNotBlank() == true -> oembedData.title
+            isPlaylist -> "YouTube Playlist"
+            else -> "YouTube Video"
+        }
+        val author = innerTubeData?.author ?: oembedData?.authorName
+        val thumbnailUrl = innerTubeData?.thumbnailUrl
+            ?: oembedData?.thumbnailUrl
+            ?: if (videoId.isNotEmpty()) "https://img.youtube.com/vi/$videoId/hqdefault.jpg" else null
+
+        val formats: List<FormatInfo> =
+            if (innerTubeData != null && innerTubeData.formats.isNotEmpty()) {
+                innerTubeData.formats.mapNotNull { innerTubeStreamToFormatInfo(it) }
+            } else {
+                buildDefaultVideoFormats(url) + buildDefaultAudioFormats(url)
+            }
 
         return VideoInfo(
             id = videoId,
             url = url,
-            title = if (isPlaylist) "YouTube Playlist" else "YouTube Video",
+            title = title,
             thumbnailUrl = thumbnailUrl,
             description = null,
-            channel = null,
+            channel = author,
             uploaderUrl = null,
-            durationSeconds = null,
-            viewCount = null,
+            durationSeconds = innerTubeData?.durationSeconds,
+            viewCount = innerTubeData?.viewCount,
             likeCount = null,
             uploadDate = null,
-            formats = formats + audioFormats,
+            formats = formats,
             isPlaylist = isPlaylist,
-            playlistTitle = if (isPlaylist) "YouTube Playlist" else null,
+            playlistTitle = if (isPlaylist) title else null,
             // playlistCount cannot be determined without authenticated API/yt-dlp;
             // set to a non-zero sentinel so the UI can show the playlist selection dialog.
-            playlistCount = if (isPlaylist) UNKNOWN_PLAYLIST_COUNT else 0
+            playlistCount = if (isPlaylist) UNKNOWN_PLAYLIST_COUNT else 0,
+            uploader = author
+        )
+    }
+
+    // ── YouTube oEmbed API (title, author, thumbnail — no auth required) ──────
+
+    private data class OembedData(
+        val title: String,
+        val authorName: String,
+        val thumbnailUrl: String?
+    )
+
+    private fun fetchYouTubeOembed(url: String): OembedData? {
+        return try {
+            val encoded = URLEncoder.encode(url, "UTF-8")
+            val oembedUrl = "https://www.youtube.com/oembed?url=$encoded&format=json"
+            val request = Request.Builder().url(oembedUrl).get().build()
+            val response = HttpClientFactory.client.newCall(request).execute()
+            if (!response.isSuccessful) return null
+            val body = response.body?.string() ?: return null
+            val json = JSONObject(body)
+            OembedData(
+                title = json.optString("title", ""),
+                authorName = json.optString("author_name", ""),
+                thumbnailUrl = json.optString("thumbnail_url").takeIf { it.isNotBlank() }
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // ── YouTube InnerTube API (stream URLs, duration, file size) ─────────────
+
+    private data class InnerTubeStream(
+        val itag: Int,
+        val url: String,
+        val mimeType: String,
+        val quality: String,
+        val qualityLabel: String?,
+        val contentLength: Long?,
+        val bitrate: Long?,
+        val fps: Int?
+    )
+
+    private data class InnerTubeData(
+        val title: String,
+        val author: String,
+        val durationSeconds: Long?,
+        val viewCount: Long?,
+        val thumbnailUrl: String?,
+        val formats: List<InnerTubeStream>
+    )
+
+    /**
+     * Queries the YouTube InnerTube player endpoint using the ANDROID_TESTSUITE client,
+     * which typically returns direct (non-ciphered) stream URLs.
+     */
+    private fun fetchYouTubeInnerTube(videoId: String): InnerTubeData? {
+        return try {
+            val bodyJson = JSONObject().apply {
+                put("context", JSONObject().apply {
+                    put("client", JSONObject().apply {
+                        put("clientName", "ANDROID_TESTSUITE")
+                        put("clientVersion", "1.9")
+                        put("androidSdkVersion", 30)
+                        put("hl", "en")
+                        put("gl", "US")
+                    })
+                })
+                put("videoId", videoId)
+            }.toString()
+
+            val request = Request.Builder()
+                .url("https://www.youtube.com/youtubei/v1/player")
+                .post(bodyJson.toRequestBody("application/json".toMediaType()))
+                .header(
+                    "User-Agent",
+                    "com.google.android.youtube/1.9 (Linux; U; Android 10) gzip"
+                )
+                .build()
+
+            val response = HttpClientFactory.client.newCall(request).execute()
+            if (!response.isSuccessful) return null
+            val responseStr = response.body?.string() ?: return null
+            val json = JSONObject(responseStr)
+
+            val videoDetails = json.optJSONObject("videoDetails") ?: return null
+            val streamingData = json.optJSONObject("streamingData")
+
+            val title = videoDetails.optString("title", "")
+            val author = videoDetails.optString("author", "")
+            val durationSeconds = videoDetails.optString("lengthSeconds", "").toLongOrNull()
+            val viewCount = videoDetails.optString("viewCount", "").toLongOrNull()
+
+            // Use highest-resolution thumbnail available
+            val thumbnailUrl = videoDetails.optJSONObject("thumbnail")
+                ?.optJSONArray("thumbnails")
+                ?.let { thumbs ->
+                    if (thumbs.length() > 0) {
+                        thumbs.getJSONObject(thumbs.length() - 1)
+                            .optString("url").takeIf { it.isNotBlank() }
+                    } else null
+                }
+
+            val streams = mutableListOf<InnerTubeStream>()
+            streamingData?.let { sd ->
+                parseInnerTubeFormats(sd.optJSONArray("formats"), streams)
+                parseInnerTubeFormats(sd.optJSONArray("adaptiveFormats"), streams)
+            }
+
+            InnerTubeData(
+                title = title,
+                author = author,
+                durationSeconds = durationSeconds,
+                viewCount = viewCount,
+                thumbnailUrl = thumbnailUrl,
+                formats = streams
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun parseInnerTubeFormats(
+        jsonArray: JSONArray?,
+        output: MutableList<InnerTubeStream>
+    ) {
+        jsonArray ?: return
+        for (i in 0 until jsonArray.length()) {
+            val f = jsonArray.getJSONObject(i)
+            // Skip formats that require signature decryption (no direct URL present)
+            val streamUrl = f.optString("url", "")
+            if (streamUrl.isBlank()) continue
+            output.add(
+                InnerTubeStream(
+                    itag = f.optInt("itag"),
+                    url = streamUrl,
+                    mimeType = f.optString("mimeType", ""),
+                    quality = f.optString("quality", "medium"),
+                    qualityLabel = f.optString("qualityLabel").takeIf { it.isNotBlank() },
+                    contentLength = f.optString("contentLength", "").toLongOrNull(),
+                    bitrate = if (f.has("bitrate")) f.optLong("bitrate") else null,
+                    fps = if (f.has("fps")) f.optInt("fps") else null
+                )
+            )
+        }
+    }
+
+    private fun innerTubeStreamToFormatInfo(stream: InnerTubeStream): FormatInfo? {
+        val mimeBase = stream.mimeType.split(";").first().trim()
+        val isAudio = mimeBase.startsWith("audio/")
+        val isVideo = mimeBase.startsWith("video/")
+        if (!isAudio && !isVideo) return null
+
+        val ext = when (mimeBase) {
+            "video/mp4" -> "mp4"
+            "video/webm" -> "webm"
+            "audio/mp4" -> "m4a"
+            "audio/webm" -> "webm"
+            else -> if (isVideo) "mp4" else "m4a"
+        }
+        val quality = stream.qualityLabel ?: stream.quality
+
+        return FormatInfo(
+            formatId = stream.itag.toString(),
+            ext = ext,
+            resolution = if (isVideo) quality else null,
+            fps = stream.fps,
+            filesize = stream.contentLength,
+            tbr = stream.bitrate?.div(1000.0),
+            vbr = if (isVideo) stream.bitrate?.div(1000.0) else null,
+            abr = if (isAudio) stream.bitrate?.div(1000.0) else null,
+            acodec = if (isAudio) ext else "aac",
+            vcodec = if (isVideo) "h264" else null,
+            quality = quality,
+            isAudioOnly = isAudio,
+            isVideoOnly = isVideo && !isAudio,
+            url = stream.url
         )
     }
 
